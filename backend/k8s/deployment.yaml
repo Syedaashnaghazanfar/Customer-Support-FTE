@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fte-api
+  labels:
+    app: fte-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fte-api
+  template:
+    metadata:
+      labels:
+        app: fte-api
+    spec:
+      containers:
+        - name: fte-api
+          image: fte-api:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: fte-secrets
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fte-api-service
+spec:
+  selector:
+    app: fte-api
+  ports:
+    - port: 80
+      targetPort: 8000
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fte-worker
+  labels:
+    app: fte-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fte-worker
+  template:
+    metadata:
+      labels:
+        app: fte-worker
+    spec:
+      containers:
+        - name: fte-worker
+          image: fte-api:latest
+          command: ["python", "-m", "workers.message_processor"]
+          envFrom:
+            - secretRef:
+                name: fte-secrets
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fte-secrets
+type: Opaque
+stringData:
+  OPENAI_API_KEY: "your-groq-api-key"
+  OPENAI_BASE_URL: "https://api.groq.com/openai/v1"
+  AGENT_MODEL: "llama-3.3-70b-versatile"
+  POSTGRES_HOST: "postgres-service"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "fte_db"
+  POSTGRES_USER: "postgres"
+  POSTGRES_PASSWORD: "postgres123"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka-service:9092"
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fte-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/cors-enable: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+spec:
+  rules:
+    - host: fte.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: fte-api-service
+                port:
+                  number: 80

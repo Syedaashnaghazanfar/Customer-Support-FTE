@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: fte-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: fte_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # NOTE: Kafka is OPTIONAL for development.
+  # The API has fallback logic to process messages directly without Kafka.
+  # To re-enable Kafka, uncomment the service below and pull a working image.
+  # kafka:
+  #   image: apache/kafka:latest
+  #   container_name: fte-kafka
+  #   ports:
+  #     - "9092:9092"
+
+volumes:
+  pgdata:
