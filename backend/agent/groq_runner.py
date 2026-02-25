@@ -238,8 +238,10 @@ def _clean_message_for_groq(msg_obj) -> dict:
 def _parse_xml_tool_calls(text: str) -> list:
     """
     Parse XML-style function calls that Groq models sometimes generate.
-    Format: <function=tool_name>{"arg": "val"}</function>
-    Also handles: <function=tool_name({"arg": "val"})></function>
+    Handles multiple formats:
+      1. <function=tool_name>{"arg": "val"}</function>
+      2. <function=tool_name({"arg": "val"})></function>
+      3. <function=tool_name{"arg": "val"}</function>  (no separator — most common from Groq errors)
     """
     calls = []
 
@@ -263,10 +265,37 @@ def _parse_xml_tool_calls(text: str) -> list:
         except json.JSONDecodeError:
             continue
 
+    # Pattern 3: <function=name{"args": ...}</function> OR <function=name={"args": ...}</function>
+    # Groq models sometimes add an extra = between name and JSON
+    if not calls:
+        pattern3 = r'<function=(\w+)=?(\{.*?\})\s*</function>'
+        for match in re.finditer(pattern3, text, re.DOTALL):
+            fn_name = match.group(1)
+            try:
+                fn_args = json.loads(match.group(2))
+                calls.append({"name": fn_name, "args": fn_args})
+            except json.JSONDecodeError:
+                continue
+
+    # Pattern 4: extract from error strings containing 'failed_generation' with escaped quotes
+    if not calls and "failed_generation" in text:
+        # Try to find function call pattern in the raw error text with flexible matching
+        pattern4 = r"<function=(\w+)\s*(\{[^}]+\})\s*</function>"
+        for match in re.finditer(pattern4, text):
+            fn_name = match.group(1)
+            raw_args = match.group(2)
+            # Handle possible escaped quotes from error string repr
+            raw_args = raw_args.replace('\\"', '"')
+            try:
+                fn_args = json.loads(raw_args)
+                calls.append({"name": fn_name, "args": fn_args})
+            except json.JSONDecodeError:
+                continue
+
     return calls
 
 
-async def run_agent(system_prompt: str, user_message: str, max_turns: int = 10) -> str:
+async def run_agent(system_prompt: str, user_message: str, max_turns: int = 5) -> str:
     """
     Run the agent using Groq's /chat/completions with tool calling.
     Includes fallback parsing for XML-style tool calls.
@@ -350,6 +379,7 @@ async def run_agent(system_prompt: str, user_message: str, max_turns: int = 10) 
             messages.append(_clean_message_for_groq(message))
 
             # Execute each tool call
+            sent_response = False
             for tool_call in message.tool_calls:
                 fn_name = tool_call.function.name
                 try:
@@ -367,10 +397,32 @@ async def run_agent(system_prompt: str, user_message: str, max_turns: int = 10) 
                     except Exception as e:
                         logger.error(f"Tool {fn_name} failed: {e}")
                         result = json.dumps({"error": str(e)})
+                    # Track if send_response was called (it's the final step)
+                    if fn_name == "send_response":
+                        sent_response = True
                 else:
                     result = json.dumps({"error": f"Unknown tool: {fn_name}"})
 
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
+
+            # If send_response was called, get one final text response and stop
+            if sent_response:
+                try:
+                    final = await _client.chat.completions.create(
+                        model=model, messages=messages, temperature=0.7, max_tokens=512,
+                    )
+                    if final.choices[0].message.content:
+                        return final.choices[0].message.content
+                except Exception:
+                    pass
+                # Return the message arg from the send_response call as fallback
+                for tool_call in message.tool_calls:
+                    if tool_call.function.name == "send_response":
+                        try:
+                            args = json.loads(tool_call.function.arguments)
+                            return args.get("message", "Your request has been processed.")
+                        except Exception:
+                            pass
 
             continue
 

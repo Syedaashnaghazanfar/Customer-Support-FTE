@@ -71,7 +71,7 @@ export default function SupportPage() {
                 success: response.ok,
                 ticket_id: data.ticket_number,
                 ai_reply: data.message,
-                message: response.ok ? "Request submitted successfully!" : data.detail || "Submission failed",
+                message: response.ok ? "Request submitted successfully!" : (typeof data.detail === "string" ? data.detail : (data.detail?.errors ? data.detail.errors.join(", ") : JSON.stringify(data.detail) || "Submission failed")),
             });
 
             if (response.ok) {
