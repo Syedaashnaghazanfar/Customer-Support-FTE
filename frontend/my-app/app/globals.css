@@ -24,7 +24,6 @@
 }
 
 :root {
-  /* Explicit colors for fallback */
   --primary: 240, 84%, 60%;
   --accent: 180, 100%, 45%;
   --bg-dark: 240, 25%, 4%;
@@ -32,22 +31,110 @@
   --text-dim: 215, 20%, 75%;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 }
 
 body {
   font-family: var(--font-sans);
   @apply bg-slate-950 text-slate-50 min-h-screen overflow-x-hidden antialiased;
 
-  /* Robust Gradient Background */
   background-image:
     radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
     radial-gradient(circle at 85% 30%, rgba(14, 165, 233, 0.1) 0%, transparent 50%),
     radial-gradient(at 0% 100%, rgba(99, 102, 241, 0.1) 0%, transparent 50%);
   background-attachment: fixed;
+}
+
+/* =========================================================================
+   ANIMATED BACKGROUND ORBS
+   ========================================================================= */
+
+.bg-orbs {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.18;
+  will-change: transform;
+}
+
+.bg-orb--1 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.6), transparent 70%);
+  top: -10%;
+  left: -5%;
+  animation: orb-drift 22s ease-in-out infinite;
+}
+
+.bg-orb--2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.5), transparent 70%);
+  top: 40%;
+  right: -8%;
+  animation: orb-drift-reverse 26s ease-in-out infinite;
+}
+
+.bg-orb--3 {
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.4), transparent 70%);
+  bottom: -5%;
+  left: 30%;
+  animation: orb-drift 30s ease-in-out infinite reverse;
+}
+
+@keyframes orb-drift {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  25% {
+    transform: translate(60px, 40px) scale(1.05);
+  }
+
+  50% {
+    transform: translate(-30px, 80px) scale(0.95);
+  }
+
+  75% {
+    transform: translate(40px, -20px) scale(1.02);
+  }
+}
+
+@keyframes orb-drift-reverse {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  25% {
+    transform: translate(-50px, 60px) scale(1.04);
+  }
+
+  50% {
+    transform: translate(40px, -40px) scale(0.96);
+  }
+
+  75% {
+    transform: translate(-20px, -60px) scale(1.03);
+  }
 }
 
 /* =========================================================================
@@ -71,6 +158,22 @@ body {
 .text-gradient-accent {
   @apply bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 to-cyan-300;
   filter: drop-shadow(0 0 10px rgba(6, 182, 212, 0.3));
+}
+
+/* =========================================================================
+   FORM INPUTS (reusable)
+   ========================================================================= */
+
+.form-input {
+  @apply w-full bg-slate-900/50 border border-white/10 rounded-xl px-5 py-3.5 text-white placeholder-slate-600 font-medium transition-all duration-200;
+}
+
+.form-input:focus {
+  @apply outline-none border-indigo-500 ring-1 ring-indigo-500;
+}
+
+.form-label {
+  @apply text-xs font-bold uppercase tracking-wider text-slate-400 px-1 block mb-2;
 }
 
 /* =========================================================================

@@ -282,6 +282,7 @@ async def channel_metrics(hours: int = 24):
     # Also provide summary stats
     summary = {
         "total_messages": 0,
+        "tickets_created": 0,
         "total_escalations": 0,
         "avg_processing_time": 0,
         "channels": {},
